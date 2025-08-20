@@ -1,11 +1,12 @@
 # LLM-Fine-Tuned DistilBERT Text Classification Model
 
-## ModelThis project fine-tunes [`huawei-noah/TinyBERT_General_4L_312D`](https://huggingface.co/huawei-noah/TinyBERT_General_4L_312D) from Hugging Face Transformers on a binary classification task. It is a lightweight BERT model designed for speed and efficiency on resource-constrained environments.
+## ModelThis project fine-tunes [`huawei-noah/TinyBERT_General_4L_312D`](https://huggingface.co/huawei-noah/TinyBERT_General_4L_312D) from Hugging Face Transformers on a binary classification task. It is a lightweight BERT model designed for speed and efficiency on resource-constrained environments.It handles class imbalance through careful data splitting and evaluation.
 
-It handles class imbalance through careful data splitting and evaluation.
-**Why TinyBERT?**
+## Why TinyBERT?
+
 - Much faster and smaller than BERT-base
 - Suitable for deployment on low-resource devices
+  
 ## Files
 - `LLM.ipynb` — Jupyter notebook for data preprocessing, model training, and evaluation.
 - `requirements.txt` — Python packages required to run this project.
@@ -30,8 +31,9 @@ The model was evaluated on an unseen test set with the following results:
 | ----- | --------- | ------ | -------- | ------- |
 | 0     | 0.9743    | 0.9773 | 0.9758   | 5633    |
 | 1     | 0.8131    | 0.7934 | 0.8032   | 702     |
-Accuracy: 0.9569 (total 6335 samples)
-Note: Class 1 is underrepresented in the dataset, which may explain the lower F1-score.
+
+- Accuracy: 0.9569 (total 6335 samples)
+- Note: Class 1 is underrepresented in the dataset, which may explain the lower F1-score.
 
 ## Usage
 - Prepare your dataset in the same format (binary labels).
