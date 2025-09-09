@@ -11,9 +11,8 @@ model from Hugging Face Transformers for a binary classification task.
 - Suitable for deployment on low-resource devices
   
 ## Files
-- `LLM.ipynb` — Jupyter notebook for data preprocessing, model training, and evaluation.
+- `LLM.py` — Colab notebook for data preprocessing, model training, and evaluation.
 - `requirements.txt` — Python packages required to run this project.
-- `finetuned_distilbert/` — Saved model directory (contains tokenizer and model files).
 - `README.md` — Project documentation (this file).
 ## Setup
 To install dependencies, run:
