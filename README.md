@@ -1,10 +1,13 @@
 # LLM-Fine-Tuned DistilBERT Text Classification Model
 
-## ModelThis project fine-tunes [`huawei-noah/TinyBERT_General_4L_312D`](https://huggingface.co/huawei-noah/TinyBERT_General_4L_312D) from Hugging Face Transformers on a binary classification task. It is a lightweight BERT model designed for speed and efficiency on resource-constrained environments.It handles class imbalance through careful data splitting and evaluation.
-
+## Model
+This project fine-tunes the huawei-noah/TinyBERT_General_4L_312D
+model from Hugging Face Transformers for a binary classification task.
+- Lightweight and efficient: TinyBERT is optimized for speed and works well on resource-constrained environments.
+- Class imbalance handling: The project uses careful data splitting and evaluation to address class imbalance and ensure robust performance.
+  
 ## Why TinyBERT?
-
-- Much faster and smaller than BERT-base
+- Much faster and smaller than BERT-Base
 - Suitable for deployment on low-resource devices
   
 ## Files
@@ -42,6 +45,6 @@ The model was evaluated on an unseen test set with the following results:
 
 ## Notes
 - This project demonstrates handling class imbalance in a binary classification task.
-- Can be extended with class weighting, oversampling, or other techniques for improved performance on minority class.
+- This project can be extended with class weighting, oversampling, or other techniques to improve performance on the minority class.
 
 
