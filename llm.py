@@ -7,49 +7,63 @@ Original file is located at
     https://colab.research.google.com/drive/15_OzRZj2JSV13JpCo5ZvBKzk4SmRA1gu
 """
 
+# =========================
+# Colab-specific setup
+# =========================
+# Install/upgrade transformers if needed
+!pip install -q --upgrade transformers
+!pip install -q --upgrade datasets
+!pip install -q --upgrade torch
+
+# Mount Google Drive if you want to save models there
+from google.colab import drive
+drive.mount('/content/drive')
+
+# Set the working directory to a folder in Google Drive (optional)
+import os
+os.chdir('/content/drive/MyDrive/LLM_project')
+
+# =========================
+# Import libraries
+# =========================
 import pandas as pd
-df1=pd.read_csv('/kaggle/input/llm-7-prompt-training-dataset/train_essays_7_prompts.csv')
-df2=pd.read_csv('/kaggle/input/llm-7-prompt-training-dataset/train_essays_7_prompts_v2.csv')
-df3=pd.read_csv('/kaggle/input/llm-7-prompt-training-dataset/train_essays_RDizzl3_seven_v1.csv')
-df4=pd.read_csv('/kaggle/input/llm-7-prompt-training-dataset/train_essays_RDizzl3_seven_v2.csv')
-
-print(f'df1 shape:',df1.shape)
-print(f'df2 shape:',df2.shape)
-print(f'df3 shape:',df3.shape)
-print(f'df4 shape:',df4.shape)
-
-print(df1.columns)
-print(df2.columns)
-print(df3.columns)
-print(df4.columns)
-
-df_all = pd.concat([df1, df2, df3, df4], ignore_index=True)
-print(df_all.shape)
-df_all.head()
-
-print(f'nulls in dataset',df_all.isnull().sum())
-
+import torch
+from torch.utils.data import Dataset, DataLoader
+from transformers import AutoTokenizer, AutoModelForSequenceClassification, AdamW, get_scheduler
 from sklearn.model_selection import train_test_split
+from sklearn.metrics import classification_report
+from tqdm import tqdm
+from collections import Counter
 
+# =========================
+# Load all datasets
+# =========================
+df1 = pd.read_csv('/kaggle/input/llm-7-prompt-training-dataset/train_essays_7_prompts.csv')
+df2 = pd.read_csv('/kaggle/input/llm-7-prompt-training-dataset/train_essays_7_prompts_v2.csv')
+df3 = pd.read_csv('/kaggle/input/llm-7-prompt-training-dataset/train_essays_RDizzl3_seven_v1.csv')
+df4 = pd.read_csv('/kaggle/input/llm-7-prompt-training-dataset/train_essays_RDizzl3_seven_v2.csv')
+
+# Combine datasets
+df_all = pd.concat([df1, df2, df3, df4], ignore_index=True)
+
+# Shuffle and split
 df_all = df_all.sample(frac=1, random_state=42).reset_index(drop=True)
 train_df, val_df = train_test_split(df_all, test_size=0.1, random_state=42)
 
-from torch.utils.data import Dataset, DataLoader
-import torch
-from transformers import AutoTokenizer, AutoModelForSequenceClassification
-
+# =========================
+# Tokenizer and dataset setup
+# =========================
 model_name = 'huawei-noah/TinyBERT_General_4L_312D'
 tokenizer = AutoTokenizer.from_pretrained(model_name)
 
-# Define your custom dataset
 class MyDataset(Dataset):
     def __init__(self, texts, labels, tokenizer, max_length=64):
         self.encodings = tokenizer(
             texts,
-            padding='max_length',      # pad to max_length
+            padding='max_length',
             truncation=True,
-            max_length=max_length,     # shorter input to save memory
-            return_tensors='pt'        # directly return PyTorch tensors
+            max_length=max_length,
+            return_tensors='pt'
         )
         self.labels = torch.tensor(labels)
 
@@ -63,70 +77,41 @@ class MyDataset(Dataset):
     def __len__(self):
         return len(self.labels)
 
-
-#####################################################
-
 train_texts = train_df['text'].tolist()
 train_labels = train_df['label'].tolist()
-
-# Prepare validation data
 val_texts = val_df['text'].tolist()
 val_labels = val_df['label'].tolist()
 
-# Create Dataset instances
 train_dataset = MyDataset(train_texts, train_labels, tokenizer)
 val_dataset = MyDataset(val_texts, val_labels, tokenizer)
 
-# Create DataLoaders
 train_loader = DataLoader(train_dataset, batch_size=16, shuffle=True)
 val_loader = DataLoader(val_dataset, batch_size=16, shuffle=False)
 
-# Create dataset and dataloader
-dataset = MyDataset(texts, labels, tokenizer)
-loader = DataLoader(dataset, batch_size=16, shuffle=True)
-
-from transformers import AutoModelForSequenceClassification
+# =========================
+# Model setup
+# =========================
 device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 print(f"Using device: {device}")
-
-from transformers import AutoModelForSequenceClassification
-
-model_name = 'huawei-noah/TinyBERT_General_4L_312D'
 
 model = AutoModelForSequenceClassification.from_pretrained(model_name, num_labels=2)
 model.to(device)
 
-from torch.optim import AdamW
-optimizer=AdamW(model.parameters(),lr=5e-5,eps=1e-8,weight_decay=0.01)
-
-import torch
-print(torch.cuda.is_available())
-print(torch.cuda.get_device_name(0) if torch.cuda.is_available() else "No GPU found")
-
-from transformers import get_scheduler
-from sklearn.metrics import classification_report
-from tqdm import tqdm
-import torch
-
+optimizer = AdamW(model.parameters(), lr=5e-5, eps=1e-8, weight_decay=0.01)
 num_epochs = 2
-
-# Scheduler setup
 num_training_steps = num_epochs * len(train_loader)
-scheduler = get_scheduler(
-    "linear",
-    optimizer=optimizer,
-    num_warmup_steps=0,
-    num_training_steps=num_training_steps
-)
+scheduler = get_scheduler("linear", optimizer=optimizer, num_warmup_steps=0, num_training_steps=num_training_steps)
 
+# =========================
+# Training loop
+# =========================
 for epoch in range(num_epochs):
     model.train()
     total_loss = 0
+    print(f"\nEpoch {epoch+1}/{num_epochs}")
 
-    print(f"\nEpoch {epoch + 1}/{num_epochs}")
     for batch in tqdm(train_loader):
         batch = {k: v.to(device) for k, v in batch.items()}
-
         outputs = model(**batch)
         loss = outputs.loss
         total_loss += loss.item()
@@ -139,105 +124,20 @@ for epoch in range(num_epochs):
     avg_loss = total_loss / len(train_loader)
     print(f"Average training loss: {avg_loss:.4f}")
 
-    # Evaluation on validation set
+    # Validation
     model.eval()
-    all_preds = []
-    all_labels = []
-
+    all_preds, all_labels = [], []
     with torch.no_grad():
         for batch in val_loader:
             batch = {k: v.to(device) for k, v in batch.items()}
             outputs = model(input_ids=batch['input_ids'], attention_mask=batch['attention_mask'])
-            logits = outputs.logits
-            preds = torch.argmax(logits, dim=-1)
+            preds = torch.argmax(outputs.logits, dim=-1)
             all_preds.extend(preds.cpu().numpy())
             all_labels.extend(batch['labels'].cpu().numpy())
-
-    print("Validation classification report:")
     print(classification_report(all_labels, all_preds, digits=4))
 
-import torch
-from torch.nn import CrossEntropyLoss
-
-from collections import Counter
-label_counts = Counter(labels)
-total_count = sum(label_counts.values())
-
-class_weights = [total_count / label_counts[i] for i in range(len(label_counts))]
-class_weights = torch.tensor(class_weights).to(device)
-
-loss_fn = CrossEntropyLoss(weight=class_weights)
-
-outputs = model(input_ids=batch['input_ids'], attention_mask=batch['attention_mask'])
-logits = outputs.logits
-
-loss = loss_fn(logits, batch['labels'])
-
-from sklearn.metrics import classification_report
-import numpy as np
-
-model.eval()
-all_preds = []
-all_labels = []
-
-with torch.no_grad():
-    for batch in val_loader:
-        batch = {k: v.to(device) for k, v in batch.items()}
-        outputs = model(input_ids=batch['input_ids'], attention_mask=batch['attention_mask'])
-        logits = outputs.logits
-        preds = torch.argmax(logits, dim=-1)
-
-        all_preds.extend(preds.cpu().numpy())
-        all_labels.extend(batch['labels'].cpu().numpy())
-
-print(classification_report(all_labels, all_preds, digits=4))
-
-model.save_pretrained("finetuned_distilbert")
-tokenizer.save_pretrained("finetuned_distilbert")
-
-#will check accuracy for unseen data
-
-df_unseen = df_all.iloc[int(0.9 * len(df_all)):].copy()
-
-
-texts_unseen = df_unseen['text'].tolist()
-labels_unseen = df_unseen['label'].tolist()
-encodings_unseen = tokenizer(texts_unseen, padding=True, truncation=True, max_length=512)
-
-class MyDataset(Dataset):
-    def __init__(self, encodings, labels):
-        self.encodings = encodings
-        self.labels = labels
-
-    def __getitem__(self, idx):
-        return {
-            'input_ids': torch.tensor(self.encodings['input_ids'][idx]),
-            'attention_mask': torch.tensor(self.encodings['attention_mask'][idx]),
-            'labels': torch.tensor(self.labels[idx])
-        }
-
-    def __len__(self):
-        return len(self.labels)
-
-unseen_dataset = MyDataset(encodings_unseen, labels_unseen)
-unseen_loader = DataLoader(unseen_dataset, batch_size=16)
-
-from sklearn.metrics import classification_report
-
-model.eval()
-all_preds = []
-all_labels = []
-
-with torch.no_grad():
-    for batch in unseen_loader:
-        batch = {k: v.to(device) for k, v in batch.items()}
-        outputs = model(input_ids=batch['input_ids'], attention_mask=batch['attention_mask'])
-        preds = torch.argmax(outputs.logits, dim=-1)
-
-        all_preds.extend(preds.cpu().numpy())
-        all_labels.extend(batch['labels'].cpu().numpy())
-
-print(classification_report(all_labels, all_preds, digits=4))
-
-model.save_pretrained("my_model")
-tokenizer.save_pretrained("my_model")
+# =========================
+# Save model
+# =========================
+model.save_pretrained("finetuned_tinybert")
+tokenizer.save_pretrained("finetuned_tinybert")
